@@ -1,0 +1,30 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:five="http://namespaces.zope.org/five"
+    xmlns:browser="http://namespaces.zope.org/browser"
+    i18n_domain="collective.subtractiveworkflow">
+
+    <five:registerClass
+        class=".workflow.SubtractiveWorkflowDefinition"
+        meta_type="Subtractive Workflow"
+        addview="addSubtractiveWorkflowDefinition.html"
+        permission="cmf.ManagePortal"
+        global="False"
+        />
+
+    <subscriber handler=".react.object_transitioned" />
+
+    <configure package="Products.GenericSetup.browser">
+
+    <browser:page
+        for="zope.app.container.interfaces.IAdding"
+        name="addSubtractiveWorkflowDefinition.html"
+        template="addWithPresettings.pt"
+        class="collective.subtractiveworkflow.browser.SubtractiveWorkflowDefinitionAddView"
+        permission="cmf.ManagePortal"
+        />
+    </configure>
+
+    <adapter factory=".exportimport.SubtractiveWorkflowDefinitionBodyAdapter" />
+
+</configure>
