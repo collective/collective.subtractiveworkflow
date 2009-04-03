@@ -20,18 +20,34 @@ workflow will set the acquire property in the same way as the default
 workflow definition, but the results will probably not be what you expect,
 since permissions that were "turned off" may well be acquired.
 
-Also note that groups loocal role mappings are not "subtractive" and work
+Also note that group-to-local role mappings are not "subtractive" and work
 exactly as in the standard workflow definition. In general, local roles are
 always inherited in Zope (although Plone has an extension to turn this off).
 
-Finally, note that there is an event handler installed which will perform the
-permission "subtraction" after a transition in a non-subtractive workflow
-in the chain for all subtractive workflows defined *later* in the chain. In
-the scenario above, this means that if an item is marked 'confidential' (and
-so the View permission should be removed from Anonymous, Authenticated and
-Member) and then goes from 'private' to 'published' (which would normally
-grant View to Anonymous), the event handler will adjust the permissions
-according to the rules of the secondary, subtractive workflow. However, if
-the subtractive workflow had been earlier in the chain, the permission
-adjustment would be skipped.
+The effects of multiple workflows
+----------------------------------
 
+This product depends on an interpretation of the DCWorkflow permissions system
+as follows:
+
+  * If there are multiple workflows in a chain, the item's state is determined
+  by all the workflows, not just the last one.
+  * In particular, the permission settings in all workflows in the chain apply
+  at all times. Later workflows can override earlier ones.
+  
+To support this, an event handler is installed that will, when a transition
+occurs, "re-play" the updateRoleMappings() call for all workflows in the chain
+(there is an optimisation to avoid duplicate work if there's only one
+workflow in the chain). It will do nothing if there are no subtractive
+workflows in the chain, but as soon as there is one, you will get this
+behaviour.
+
+Thus, if you have a subtractive workflow as the second workflow in a
+two-workflow chain, and you invoke a transition from either the first or the
+second workflow, the permissions from both will apply, with the subtractive
+workflow allowed to override the normal workflow.
+
+Note that this may affect existing multi-workflow chains, because by default,
+DCWorkflow does not "re-play" the role mappings in this way, letting instead
+the most recently entered state determine the role mappings and fully
+overriding roles from the current state of any other workflows in the chain.

@@ -59,9 +59,31 @@ class SubtractiveWorkflowDefinition(DCWorkflowDefinition):
     def __init__(self, id):
         super(SubtractiveWorkflowDefinition, self).__init__(id)
     
+    # Hack alert!
+    
+    def _executeTransition(self, ob, tdef=None, kwargs=None):
+        """Execute a transition. We set a flag to defer calling
+        updateRoleMappingsFor() until the event handler (see react.py) since
+        we know this needs to be called eventually anyway
+        """
+        
+        try:
+            self._v_executing_transition = True
+            return super(SubtractiveWorkflowDefinition, self)._executeTransition(ob, tdef, kwargs)
+        finally:
+            self._v_executing_transition = False
+        
     def updateRoleMappingsFor(self, obj):
         """Changes the objject permissions according to the current state.
         """
+        
+        # Delay if we are executing a transition - the event handler will
+        # do the work.
+        if getattr(self, '_v_executing_transition', False):
+            self._v_executing_transition = False
+            # XXX: May not be right
+            return True
+        
         changed = False
         
         state = self._getWorkflowStateOf(obj)
