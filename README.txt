@@ -1,3 +1,8 @@
+.. ATTENTION::
+  This version works only on Plone 4 (Products.CMFCore 2.2,
+  Products.DCWorkflow 2.2)
+  If you want to use this package on Plone 3.3, please use the 1.0b1 version.
+
 Introduction
 ============
 
