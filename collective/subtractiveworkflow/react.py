@@ -14,10 +14,6 @@ def object_transitioned(event):
     correct "subtraction" can take place.
     """
     
-    # On create, there's no transition. Do nothing.
-    if event.transition is None:
-        return
-
     obj = event.object
     wf_tool = getToolByName(obj, 'portal_workflow', None)
     

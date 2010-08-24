@@ -27,9 +27,11 @@ class SubtractiveWorkflowDefinitionBodyAdapter(DCWorkflowDefinitionBodyAdapter):
 
         (workflow_id, title, state_variable, initial_state, states, 
          transitions, variables, worklists, permissions, 
-         scripts, description) = wfdc.parseWorkflowXML(body, 'utf-8')
+         scripts, description, manager_bypass,
+         creation_guard) = wfdc.parseWorkflowXML(body, 'utf-8')
 
-        _initDCWorkflow(self.context, title, description , state_variable, 
+        _initDCWorkflow(self.context, title, description, manager_bypass,
+                        creation_guard, state_variable,
                         initial_state, states, transitions, variables,
                         worklists, permissions, scripts, self.environ)
 

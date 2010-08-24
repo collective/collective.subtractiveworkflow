@@ -1,6 +1,6 @@
 ##############################################################################
 #
-# Copyright (c) 2004 Zope Corporation and Contributors. All Rights Reserved.
+# Copyright (c) 2004 Zope Foundation and Contributors.
 #
 # This software is subject to the provisions of the Zope Public License,
 # Version 2.1 (ZPL).  A copy of the ZPL should accompany this distribution.
@@ -25,6 +25,7 @@ from Products.CMFCore.exportimport.tests.test_workflow \
 from Products.CMFCore.exportimport.tests.test_workflow \
         import _WorkflowSetup as WorkflowSetupBase
 from Products.CMFCore.testing import DummyWorkflow
+from Products.DCWorkflow.Guard import Guard
 from Products.DCWorkflow.Transitions import TRIGGER_USER_ACTION
 from Products.DCWorkflow.Transitions import TRIGGER_AUTOMATIC
 from Products.GenericSetup.tests.common import DummyExportContext
@@ -32,12 +33,19 @@ from Products.GenericSetup.tests.common import DummyImportContext
 
 from collective.subtractiveworkflow.workflow import SubtractiveWorkflowDefinition
 
-from Products.Five import zcml
+from Testing.ZopeTestCase.layer import ZopeLite
 from zope.testing.cleanup import cleanUp
 
 from Products.CMFCore.testing import _DUMMY_ZCML
 
-class ExportImportZCMLLayer:
+# BBB for Zope 2.12
+try:
+    from Zope2.App import zcml
+except ImportError:
+    from Products.Five import zcml
+
+
+class ExportImportZCMLLayer(ZopeLite):
 
     @classmethod
     def setUp(cls):
@@ -49,8 +57,8 @@ class ExportImportZCMLLayer:
         import collective.subtractiveworkflow
         
         zcml.load_config('meta.zcml', Products.Five)
-        zcml.load_config('configure.zcml', Products.Five)
         zcml.load_config('meta.zcml', Products.GenericSetup)
+        zcml.load_config('configure.zcml', Products.Five)
         zcml.load_config('configure.zcml', Products.GenericSetup)
         zcml.load_config('tool.zcml', Products.CMFCore)
         zcml.load_config('configure.zcml', Products.CMFCore.exportimport)
@@ -171,11 +179,12 @@ class _WorkflowSetup(WorkflowSetupBase):
                                     , after_script_name=v[ 5 ]
                                     , actbox_name=v[ 6 ]
                                     , actbox_url=v[ 7 ]
-                                    , actbox_category=v[ 8 ]
+                                    , actbox_icon=v[ 8 ]
+                                    , actbox_category=v[ 9 ]
                                     , props=self._genGuardProps( *v[ -4: ] )
                                     )
 
-            for k, v in v[ 9 ].items():
+            for k, v in v[ 10 ].items():
                 transition.addVariable( k, v )
 
     def _initWorklists( self, dcworkflow ):
@@ -195,7 +204,8 @@ class _WorkflowSetup(WorkflowSetupBase):
             worklist.setProperties( description=v[ 1 ]
                                   , actbox_name=v[ 3 ]
                                   , actbox_url=v[ 4 ]
-                                  , actbox_category=v[ 5 ]
+                                  , actbox_icon=v[ 5 ]
+                                  , actbox_category=v[ 6 ]
                                   , props=props
                                   )
 
@@ -214,6 +224,12 @@ class _WorkflowSetup(WorkflowSetupBase):
                 raise ValueError, 'Unknown script type: %s' % v[ 0 ]
 
             dcworkflow.scripts._setObject( k, script )
+    
+    def _initCreationGuard(self, dcworkflow) :
+        props = self._genGuardProps(*_CREATION_GUARD)
+        g = Guard()
+        g.changeFromProperties(props)
+        dcworkflow.creation_guard = g
 
 
 class WorkflowDefinitionConfiguratorTests( _WorkflowSetup, _GuardChecker ):
@@ -402,14 +418,15 @@ class WorkflowDefinitionConfiguratorTests( _WorkflowSetup, _GuardChecker ):
             self.assertEqual( info[ 'after_script_name' ], expected[ 5 ] )
             self.assertEqual( info[ 'actbox_name' ], expected[ 6 ] )
             self.assertEqual( info[ 'actbox_url' ], expected[ 7 ] )
-            self.assertEqual( info[ 'actbox_category' ], expected[ 8 ] )
+            self.assertEqual( info[ 'actbox_icon' ], expected[ 8 ] )
+            self.assertEqual( info[ 'actbox_category' ], expected[ 9 ] )
 
             variables = info[ 'variables' ]
-            self.assertEqual( len( variables ), len( expected[ 9 ] ) )
+            self.assertEqual( len( variables ), len( expected[ 10 ] ) )
 
             for v_info in variables:
                 self.assertEqual( v_info[ 'expr' ]
-                                , expected[ 9 ][ v_info[ 'name' ] ] )
+                                , expected[ 10 ][ v_info[ 'name' ] ] )
 
             self._assertGuard( info, *expected[ -4: ] )
 
@@ -440,7 +457,8 @@ class WorkflowDefinitionConfiguratorTests( _WorkflowSetup, _GuardChecker ):
             self.assertEqual( info[ 'description' ], expected[ 1 ] )
             self.assertEqual( info[ 'actbox_name' ], expected[ 3 ] )
             self.assertEqual( info[ 'actbox_url' ], expected[ 4 ] )
-            self.assertEqual( info[ 'actbox_category' ], expected[ 5 ] )
+            self.assertEqual( info[ 'actbox_icon' ], expected[ 5 ] )
+            self.assertEqual( info[ 'actbox_category' ], expected[ 6 ] )
 
             var_match = info[ 'var_match' ]
             self.assertEqual( len( var_match ), len( expected[ 2 ] ) )
@@ -486,6 +504,13 @@ class WorkflowDefinitionConfiguratorTests( _WorkflowSetup, _GuardChecker ):
                                 , expected[ 2 ] % WF_ID )
             else:
                 self.assertEqual( info[ 'filename' ], expected[ 2 ] )
+    
+    def test_getWorkflowInfo_dcworkflow_creation_guard(self) :
+        WF_ID = 'dcworkflow_creation_guard'
+
+        site = self._initSite()
+        dcworkflow = self._initDCWorkflow( WF_ID )
+        self._initCreationGuard(dcworkflow)
 
     def test_generateXML_empty( self ):
 
@@ -617,6 +642,8 @@ class WorkflowDefinitionConfiguratorTests( _WorkflowSetup, _GuardChecker ):
         , permissions
         , scripts
         , description
+        , manager_bypass
+        , creation_guard
         ) = configurator.parseWorkflowXML( _EMPTY_WORKFLOW_EXPORT
                                          % ( WF_ID
                                            , WF_TITLE
@@ -654,6 +681,8 @@ class WorkflowDefinitionConfiguratorTests( _WorkflowSetup, _GuardChecker ):
         , permissions
         , scripts
         , description
+        , manager_bypass
+        , creation_guard
         ) = configurator.parseWorkflowXML(
                           _NORMAL_WORKFLOW_EXPORT
                           % { 'workflow_id' : WF_ID
@@ -691,6 +720,8 @@ class WorkflowDefinitionConfiguratorTests( _WorkflowSetup, _GuardChecker ):
         , permissions
         , scripts
         , description
+        , manager_bypass
+        , creation_guard
         ) = configurator.parseWorkflowXML(
                           _NORMAL_WORKFLOW_EXPORT
                           % { 'workflow_id' : WF_ID
@@ -757,6 +788,8 @@ class WorkflowDefinitionConfiguratorTests( _WorkflowSetup, _GuardChecker ):
         , permissions
         , scripts
         , description 
+        , manager_bypass
+        , creation_guard
         ) = configurator.parseWorkflowXML(
                           _NORMAL_WORKFLOW_EXPORT
                           % { 'workflow_id' : WF_ID
@@ -790,18 +823,19 @@ class WorkflowDefinitionConfiguratorTests( _WorkflowSetup, _GuardChecker ):
             action = transition[ 'action' ]
             self.assertEqual( action.get( 'name', '' ), expected[ 6 ] )
             self.assertEqual( action.get( 'url', '' ), expected[ 7 ] )
-            self.assertEqual( action.get( 'category', '' ), expected[ 8 ] )
+            self.assertEqual( action.get( 'icon', '' ), expected[ 8 ] )
+            self.assertEqual( action.get( 'category', '' ), expected[ 9 ] )
 
-            self.assertEqual( transition[ 'variables' ], expected[ 9 ] )
+            self.assertEqual( transition[ 'variables' ], expected[ 10 ] )
 
             guard = transition[ 'guard' ]
             self.assertEqual( tuple( guard.get( 'permissions', () ) )
-                            , expected[ 10 ] )
-            self.assertEqual( tuple( guard.get( 'roles', () ) )
                             , expected[ 11 ] )
-            self.assertEqual( tuple( guard.get( 'groups', () ) )
+            self.assertEqual( tuple( guard.get( 'roles', () ) )
                             , expected[ 12 ] )
-            self.assertEqual( guard.get( 'expression', '' ), expected[ 13 ] )
+            self.assertEqual( tuple( guard.get( 'groups', () ) )
+                            , expected[ 13 ] )
+            self.assertEqual( guard.get( 'expression', '' ), expected[ 14 ] )
 
     def test_parseWorkflowXML_normal_variables( self ):
 
@@ -825,6 +859,8 @@ class WorkflowDefinitionConfiguratorTests( _WorkflowSetup, _GuardChecker ):
         , permissions
         , scripts
         , description
+        , manager_bypass
+        , creation_guard
         ) = configurator.parseWorkflowXML(
                           _NORMAL_WORKFLOW_EXPORT
                           % { 'workflow_id' : WF_ID
@@ -903,6 +939,8 @@ class WorkflowDefinitionConfiguratorTests( _WorkflowSetup, _GuardChecker ):
         , permissions
         , scripts
         , description
+        , manager_bypass
+        , creation_guard
         ) = configurator.parseWorkflowXML(
                           _NORMAL_WORKFLOW_EXPORT
                           % { 'workflow_id' : WF_ID
@@ -932,16 +970,17 @@ class WorkflowDefinitionConfiguratorTests( _WorkflowSetup, _GuardChecker ):
             action = worklist[ 'action' ]
             self.assertEqual( action.get( 'name', '' ), expected[ 3 ] )
             self.assertEqual( action.get( 'url', '' ), expected[ 4 ] )
-            self.assertEqual( action.get( 'category', '' ), expected[ 5 ] )
+            self.assertEqual( action.get( 'icon', '' ), expected[ 5 ] )
+            self.assertEqual( action.get( 'category', '' ), expected[ 6 ] )
 
             guard = worklist[ 'guard' ]
             self.assertEqual( tuple( guard.get( 'permissions', () ) )
-                            , expected[ 6 ] )
-            self.assertEqual( tuple( guard.get( 'roles', () ) )
                             , expected[ 7 ] )
-            self.assertEqual( tuple( guard.get( 'groups', () ) )
+            self.assertEqual( tuple( guard.get( 'roles', () ) )
                             , expected[ 8 ] )
-            self.assertEqual( guard.get( 'expression', '' ), expected[ 9 ] )
+            self.assertEqual( tuple( guard.get( 'groups', () ) )
+                            , expected[ 9 ] )
+            self.assertEqual( guard.get( 'expression', '' ), expected[ 10 ] )
 
     def test_parseWorkflowXML_normal_permissions( self ):
 
@@ -965,6 +1004,8 @@ class WorkflowDefinitionConfiguratorTests( _WorkflowSetup, _GuardChecker ):
         , permissions
         , scripts
         , description
+        , manager_bypass
+        , creation_guard
         ) = configurator.parseWorkflowXML(
                           _NORMAL_WORKFLOW_EXPORT
                           % { 'workflow_id' : WF_ID
@@ -1002,6 +1043,8 @@ class WorkflowDefinitionConfiguratorTests( _WorkflowSetup, _GuardChecker ):
         , permissions
         , scripts
         , description
+        , manager_bypass
+        , creation_guard
         ) = configurator.parseWorkflowXML(
                           _NORMAL_WORKFLOW_EXPORT
                           % { 'workflow_id' : WF_ID
@@ -1119,6 +1162,7 @@ _WF_TRANSITIONS = \
              , ''
              , 'Open'
              , 'string:${object_url}/open_for_modifications'
+             , 'string:${portal_url}/open.png'
              , 'workflow'
              , { 'when_opened' : 'object/ZopeTime' }
              , ( 'Open content for modifications', )
@@ -1134,6 +1178,7 @@ _WF_TRANSITIONS = \
              , 'after_close'
              , 'Close'
              , 'string:${object_url}/close_for_modifications'
+             , 'string:${portal_url}/close.png'
              , 'workflow'
              , {}
              , ()
@@ -1149,6 +1194,7 @@ _WF_TRANSITIONS = \
              , 'after_kill'
              , 'Kill'
              , 'string:${object_url}/kill_object'
+             , 'string:${portal_url}/kill.png'
              , 'workflow'
              , { 'killed_by' : 'string:${user/getId}' }
              , ()
@@ -1161,6 +1207,7 @@ _WF_TRANSITIONS = \
              , 'expired'
              , TRIGGER_AUTOMATIC
              , 'before_expire'
+             , ''
              , ''
              , ''
              , ''
@@ -1179,6 +1226,7 @@ _WF_WORKLISTS = \
                     , { 'state' : ( 'expired', ) }
                     , 'Expired items'
                     , 'string:${portal_url}/expired_items'
+                    , 'string:${portal_url}/expired.png'
                     , 'workflow'
                     , ( 'Restore expired content', )
                     , ()
@@ -1190,6 +1238,7 @@ _WF_WORKLISTS = \
                     , { 'state' : ( 'open',  'closed' ) }
                     , 'Expired items'
                     , 'string:${portal_url}/expired_items'
+                    , 'string:${portal_url}/alive.png'
                     , 'workflow'
                     , ( 'Restore expired content', )
                     , ()
@@ -1264,6 +1313,13 @@ _WF_SCRIPTS = \
                    )
 }
 
+_CREATION_GUARD = \
+(('Add portal content', 'Manage portal')
+,('Owner', 'Manager')
+,('group_readers', 'group_members')
+,'python:len(here.objectIds() <= 10)'
+)
+
 _NORMAL_TOOL_EXPORT = """\
 <?xml version="1.0"?>
 <object name="portal_workflow" meta_type="Dummy Workflow Tool">
@@ -1306,7 +1362,8 @@ _EMPTY_WORKFLOW_EXPORT = """\
     title="%s"
     description="%s"
     state_variable="state"
-    initial_state="%s">
+    initial_state="%s"
+    manager_bypass="False">
 </dc-workflow>
 """
 
@@ -1318,7 +1375,8 @@ _OLD_WORKFLOW_EXPORT = """\
     workflow_id="%(workflow_id)s"
     title="%(title)s"
     state_variable="state"
-    initial_state="%(initial_state)s">
+    initial_state="%(initial_state)s"
+    manager_bypass="False">
  <permission>Open content for modifications</permission>
  <permission>Modify content</permission>
  <permission>Query history</permission>
@@ -1562,7 +1620,8 @@ _NORMAL_WORKFLOW_EXPORT = """\
     title="%(title)s"
     description="%(description)s"
     state_variable="state"
-    initial_state="%(initial_state)s">
+    initial_state="%(initial_state)s"
+    manager_bypass="False">
  <permission>Open content for modifications</permission>
  <permission>Modify content</permission>
  <permission>Query history</permission>
@@ -1648,7 +1707,8 @@ _NORMAL_WORKFLOW_EXPORT = """\
   <description>Close the object for modifications</description>
   <action
     category="workflow"
-    url="string:${object_url}/close_for_modifications">Close</action>
+    url="string:${object_url}/close_for_modifications"
+    icon="string:${portal_url}/close.png">Close</action>
   <guard>
    <guard-role>Owner</guard-role>
    <guard-role>Manager</guard-role>
@@ -1678,7 +1738,8 @@ _NORMAL_WORKFLOW_EXPORT = """\
   <description>Make the object permanently unavailable.</description>
   <action
     category="workflow"
-    url="string:${object_url}/kill_object">Kill</action>
+    url="string:${object_url}/kill_object"
+    icon="string:${portal_url}/kill.png">Kill</action>
   <guard>
    <guard-group>Content_assassins</guard-group>
   </guard>
@@ -1695,7 +1756,8 @@ _NORMAL_WORKFLOW_EXPORT = """\
   <description>Open the object for modifications</description>
   <action
     category="workflow"
-    url="string:${object_url}/open_for_modifications">Open</action>
+    url="string:${object_url}/open_for_modifications"
+    icon="string:${portal_url}/open.png">Open</action>
   <guard>
    <guard-permission>Open content for modifications</guard-permission>
   </guard>
@@ -1708,7 +1770,8 @@ _NORMAL_WORKFLOW_EXPORT = """\
   <description>Worklist for content not yet expired / killed</description>
   <action
     category="workflow"
-    url="string:${portal_url}/expired_items">Expired items</action>
+    url="string:${portal_url}/expired_items"
+    icon="string:${portal_url}/alive.png">Expired items</action>
   <guard>
    <guard-permission>Restore expired content</guard-permission>
   </guard>
@@ -1720,7 +1783,8 @@ _NORMAL_WORKFLOW_EXPORT = """\
   <description>Worklist for expired content</description>
   <action
     category="workflow"
-    url="string:${portal_url}/expired_items">Expired items</action>
+    url="string:${portal_url}/expired_items"
+    icon="string:${portal_url}/expired.png">Expired items</action>
   <guard>
    <guard-permission>Restore expired content</guard-permission>
   </guard>
@@ -1796,6 +1860,26 @@ _NORMAL_WORKFLOW_EXPORT = """\
     module=""
     function=""
     />
+</dc-workflow>
+"""
+
+_CREATION_GUARD_WORKFLOW_EXPORT = """\
+<?xml version="1.0"?>
+<dc-workflow
+    workflow_id="%s"
+    title="%s"
+    description="%s"
+    state_variable="state"
+    initial_state="%s"
+    manager_bypass="True">
+ <instance-creation-conditions>
+  <guard>
+   <guard-permission>Add portal content</guard-permission>
+   <guard-role>Owner</guard-role>
+   <guard-group>group_members</guard-group>
+   <guard-expression>python:len(here.objectIds() &lt;= 10)</guard-expression>
+  </guard>
+ </instance-creation-conditions>
 </dc-workflow>
 """
 
@@ -2338,21 +2422,22 @@ class Test_importWorkflow(_WorkflowSetup, _GuardChecker):
             self.assertEqual( transition.after_script_name, expected[ 5 ] )
             self.assertEqual( transition.actbox_name, expected[ 6 ] )
             self.assertEqual( transition.actbox_url, expected[ 7 ] )
-            self.assertEqual( transition.actbox_category, expected[ 8 ] )
+            self.assertEqual( transition.actbox_icon, expected[ 8 ] )
+            self.assertEqual( transition.actbox_category, expected[ 9 ] )
 
             var_exprs = transition.var_exprs
 
-            self.assertEqual( len( var_exprs ), len( expected[ 9 ] ) )
+            self.assertEqual( len( var_exprs ), len( expected[ 10 ] ) )
 
             for var_id, expr in var_exprs.items():
-                self.assertEqual( expr.text, expected[ 9 ][ var_id ] )
+                self.assertEqual( expr.text, expected[ 10 ][ var_id ] )
 
             guard = transition.getGuard()
 
-            self.assertEqual( guard.permissions, expected[ 10 ] )
-            self.assertEqual( guard.roles, expected[ 11 ] )
-            self.assertEqual( guard.groups, expected[ 12 ] )
-            self.assertEqual( guard.getExprText(), expected[ 13 ] )
+            self.assertEqual( guard.permissions, expected[ 11 ] )
+            self.assertEqual( guard.roles, expected[ 12 ] )
+            self.assertEqual( guard.groups, expected[ 13 ] )
+            self.assertEqual( guard.getExprText(), expected[ 14 ] )
 
     def test_from_empty_dcworkflow_workflow_worklists( self ):
 
@@ -2389,14 +2474,15 @@ class Test_importWorkflow(_WorkflowSetup, _GuardChecker):
 
             self.assertEqual( worklist.actbox_name, expected[ 3 ] )
             self.assertEqual( worklist.actbox_url, expected[ 4 ] )
-            self.assertEqual( worklist.actbox_category, expected[ 5 ] )
+            self.assertEqual( worklist.actbox_icon, expected[ 5 ] )
+            self.assertEqual( worklist.actbox_category, expected[ 6 ] )
 
             guard = worklist.getGuard()
 
-            self.assertEqual( guard.permissions, expected[ 6 ] )
-            self.assertEqual( guard.roles, expected[ 7 ] )
-            self.assertEqual( guard.groups, expected[ 8 ] )
-            self.assertEqual( guard.getExprText(), expected[ 9 ] )
+            self.assertEqual( guard.permissions, expected[ 7 ] )
+            self.assertEqual( guard.roles, expected[ 8 ] )
+            self.assertEqual( guard.groups, expected[ 9 ] )
+            self.assertEqual( guard.getExprText(), expected[ 10 ] )
 
     def test_from_old_dcworkflow_workflow_scripts( self ):
 
