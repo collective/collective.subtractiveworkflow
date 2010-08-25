@@ -1,6 +1,6 @@
 .. ATTENTION::
   This version works only on Plone 4 (Products.CMFCore 2.2,
-  Products.DCWorkflow 2.2)
+  Products.DCWorkflow 2.2).
   If you want to use this package on Plone 3.3, please use the 1.0b1 version.
 
 Introduction
@@ -35,9 +35,10 @@ The effects of multiple workflows
 This product depends on an interpretation of the DCWorkflow permissions system
 as follows:
 
-  * If there are multiple workflows in a chain, the item's state is determined
+* If there are multiple workflows in a chain, the item's state is determined
   by all the workflows, not just the last one.
-  * In particular, the permission settings in all workflows in the chain apply
+
+* In particular, the permission settings in all workflows in the chain apply
   at all times. Later workflows can override earlier ones.
   
 To support this, an event handler is installed that will, when a transition
