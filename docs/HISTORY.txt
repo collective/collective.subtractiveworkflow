@@ -1,7 +1,7 @@
 Changelog
 =========
 
-2.0b1 - unreleased
+2.0b1 (2010-09-11)
 ------------------
 
 - The fact of setting dummy to the container generate an AddedObjectEvent, 
